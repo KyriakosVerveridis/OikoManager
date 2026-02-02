@@ -22,10 +22,11 @@ class Apartment(models.Model):
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='apartments')
     number = models.CharField(max_length=10)
     sq_meters = models.DecimalField(max_digits=6, decimal_places=2)
-    heating_coeff = models.DecimalField(max_digits=5, decimal_places=4)
+    heating_coeff = models.DecimalField(max_digits=5, decimal_places=4, default=0.0)
+    elevator_coeff = models.DecimalField(max_digits=5, decimal_places=4, default=0.0)
 
     def __str__(self):
-        return f"{self.building.name} - {self.number}"
+        return f"{self.building.name} - Apt {self.number}"
 
 # 4. Expense Model
 class Expense(models.Model):
