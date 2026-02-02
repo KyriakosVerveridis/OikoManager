@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Building, Apartment, Expense, MeterReading
 
+
 class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Building
