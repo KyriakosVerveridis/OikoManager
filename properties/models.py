@@ -35,12 +35,24 @@ class Expense(models.Model):
         ('elevator', 'Elevator'),
         ('electricity', 'Electricity'),
         ('water', 'Water'),
+        ('heating', 'Heating'),
         ('repairs', 'Repairs'),
+        ('gardening', 'Gardening'),
+        ('other', 'Other'),
     )
-    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='expenses')
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+
+    building = models.ForeignKey(Building, related_name='expenses', on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
+    description = models.CharField(max_length=255, blank=True, null=True)
+    category = models.CharField(
+        max_length=20, 
+        choices=CATEGORY_CHOICES, 
+        default='other'
+    )
+
+    def __str__(self):
+        return f"{self.category} - {self.amount} ({self.building.name})"
 
 # 5. Meter Reading Model
 class MeterReading(models.Model):

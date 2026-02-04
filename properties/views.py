@@ -16,34 +16,43 @@ class BuildingViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def calculate_bills(self, request, pk=None):
-        """
-        Custom action to calculate expenses per apartment based on square meters.
-        """
         building = self.get_object()
         apartments = building.apartments.all()
         expenses = building.expenses.all()
 
-        # Calculate total expense amount and total building square meters
-        # Uses Django aggregation for database efficiency
-        total_expense_amount = expenses.aggregate(Sum('amount'))['amount__sum'] or 0
-        total_sq_meters = apartments.aggregate(Sum('sq_meters'))['sq_meters__sum'] or 1
+        # 1. Split expenses into groups
+        # Why? Because cleaning/water use sq_meters, but heating uses heating_coeff
+        total_general = sum(e.amount for e in expenses if e.category not in ['heating', 'elevator'])
+        total_heating = sum(e.amount for e in expenses if e.category == 'heating')
+        total_elevator = sum(e.amount for e in expenses if e.category == 'elevator')
 
-        results = []
+        # 2. Calculate denominators (totals)
+        total_sq_meters = sum(a.sq_meters for a in apartments) or 1
+        total_heating_coeff = sum(a.heating_coeff for a in apartments) or 1
+        total_elevator_coeff = sum(a.elevator_coeff for a in apartments) or 1
+
+        bills = []
         for apt in apartments:
-            # Formula: (Apartment Sqm / Total Building Sqm) * Total Expenses
-            share = (apt.sq_meters / total_sq_meters) * total_expense_amount
+            # 3. Calculate each part separately
+            share_general = (total_general * apt.sq_meters) / total_sq_meters
+            share_heating = (total_heating * apt.heating_coeff) / total_heating_coeff
+            share_elevator = (total_elevator * apt.elevator_coeff) / total_elevator_coeff
             
-            results.append({
+            total_apt_bill = share_general + share_heating + share_elevator
+
+            # 4. Create the detailed response
+            bills.append({
                 "apartment_number": apt.number,
-                "sq_meters": float(apt.sq_meters),
-                "share_amount": round(float(share), 2)
+                "general_share": round(float(share_general), 2),
+                "heating_share": round(float(share_heating), 2),
+                "elevator_share": round(float(share_elevator), 2),
+                "total_amount": round(float(total_apt_bill), 2)
             })
 
         return Response({
             "building_name": building.name,
-            "total_expenses": float(total_expense_amount),
-            "total_sq_meters": float(total_sq_meters),
-            "bills": results
+            "total_expenses_all": float(total_general + total_heating + total_elevator),
+            "bills": bills
         })
 
 
