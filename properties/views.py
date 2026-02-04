@@ -20,27 +20,40 @@ class BuildingViewSet(viewsets.ModelViewSet):
         apartments = building.apartments.all()
         expenses = building.expenses.all()
 
+        if not apartments.exists():
+            return Response({"error": "No apartments found in this building."}, status=400)
+
         # 1. Split expenses into groups
-        # Why? Because cleaning/water use sq_meters, but heating uses heating_coeff
         total_general = sum(e.amount for e in expenses if e.category not in ['heating', 'elevator'])
         total_heating = sum(e.amount for e in expenses if e.category == 'heating')
         total_elevator = sum(e.amount for e in expenses if e.category == 'elevator')
 
-        # 2. Calculate denominators (totals)
-        total_sq_meters = sum(a.sq_meters for a in apartments) or 1
-        total_heating_coeff = sum(a.heating_coeff for a in apartments) or 1
-        total_elevator_coeff = sum(a.elevator_coeff for a in apartments) or 1
+        # 2. Calculate denominators with safety checks
+        total_sq_meters = sum(a.sq_meters for a in apartments)
+        total_heating_coeff = sum(a.heating_coeff for a in apartments)
+        total_elevator_coeff = sum(a.elevator_coeff for a in apartments)
 
         bills = []
+        warnings = []
+
+        # Check for zero denominators to avoid ZeroDivisionError
+        if total_heating > 0 and total_heating_coeff == 0:
+            warnings.append("Heating expenses exist but all apartments have 0 heating coefficient.")
+        if total_elevator > 0 and total_elevator_coeff == 0:
+            warnings.append("Elevator expenses exist but all apartments have 0 elevator coefficient.")
+
         for apt in apartments:
-            # 3. Calculate each part separately
-            share_general = (total_general * apt.sq_meters) / total_sq_meters
-            share_heating = (total_heating * apt.heating_coeff) / total_heating_coeff
-            share_elevator = (total_elevator * apt.elevator_coeff) / total_elevator_coeff
+            # General Share (always based on sq_meters)
+            share_general = (total_general * apt.sq_meters) / total_sq_meters if total_sq_meters > 0 else 0
+            
+            # Heating Share (safety check)
+            share_heating = (total_heating * apt.heating_coeff) / total_heating_coeff if total_heating_coeff > 0 else 0
+            
+            # Elevator Share (safety check)
+            share_elevator = (total_elevator * apt.elevator_coeff) / total_elevator_coeff if total_elevator_coeff > 0 else 0
             
             total_apt_bill = share_general + share_heating + share_elevator
 
-            # 4. Create the detailed response
             bills.append({
                 "apartment_number": apt.number,
                 "general_share": round(float(share_general), 2),
@@ -52,6 +65,7 @@ class BuildingViewSet(viewsets.ModelViewSet):
         return Response({
             "building_name": building.name,
             "total_expenses_all": float(total_general + total_heating + total_elevator),
+            "warnings": warnings,
             "bills": bills
         })
 
