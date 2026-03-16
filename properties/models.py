@@ -59,3 +59,4 @@ class MeterReading(models.Model):
     apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name='readings')
     hours = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
+    unique_together = ('apartment', 'date')
